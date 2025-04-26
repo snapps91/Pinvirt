@@ -1,4 +1,39 @@
 #!/usr/bin/env python3
+"""
+================================================================================
+ CPU Pinning Manager
+================================================================================
+
+Description:
+  A Python utility to automate and manage CPU core assignments (pinning) 
+  for Virtual Machines (VMs) on Linux hosts. It retrieves the CPU topology 
+  using 'lscpu', tracks VM-to-CPU mappings in a local JSON database, 
+  and generates oVirt-compatible CPU pinning strings.
+
+Features:
+  - Automatic or manual CPU allocation for VMs
+  - Multi-socket and hyper-threading support
+  - Display of host CPU topology and available logical CPUs
+  - Persistent storage of pinning assignments
+  - Easy removal of VM entries
+
+Requirements:
+  - Python 3.x
+  - 'lscpu' command available on the system
+
+Usage:
+  Run the script with the desired command:
+    python3 pin_manager.py --help
+
+Author:
+  Giacomo Failla - 2025 <giacomo.failla@cheope.io>
+
+License:
+  MIT License
+
+================================================================================
+"""
+
 import subprocess
 import sys
 import json
