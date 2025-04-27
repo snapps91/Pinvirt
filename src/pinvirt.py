@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ================================================================================
- CPU Pinning Manager
+Pinvirt
 ================================================================================
 
 Description:
@@ -43,7 +43,7 @@ from typing import List, Tuple, Dict, Set, Optional
 PinningMap = Dict[str, List[int]]
 CpuInfo = List[Tuple[int, int, int]]  # (logical_cpu, core_id, socket_id)
 
-PINNING_FILE = "cpu_pinning_map.json"
+PINNING_FILE = "/etc/pinvirt/cpu_pinning_map.json"
 
 
 def load_pinning() -> PinningMap:
@@ -317,6 +317,11 @@ Commands:
 
 
 def main() -> None:
+
+    """ Verify is root user """
+    if os.geteuid() != 0:
+        print("[ERROR] This script must be run as root.")
+        sys.exit(1)
     args: List[str] = sys.argv
     if len(args) < 2 or args[1] == "--help":
         print_help()
