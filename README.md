@@ -1,6 +1,6 @@
-# CPU Pinning Manager
+# oVirt - CPU Pinning Tool
 
-**CPU Pinning Manager** is a Python tool that helps automate and manage CPU core assignments (pinning) for Virtual Machines (VMs) on a Linux host.  
+**Pinvirt** is a Python tool that helps automate and manage CPU core assignments (pinning) for Virtual Machines (VMs) on a Linux host.  
 It retrieves the CPU topology using `lscpu`, manages pinning assignments via a local JSON database, and generates oVirt-compatible pinning strings.
 
 ## Features
