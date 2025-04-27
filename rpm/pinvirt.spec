@@ -1,5 +1,5 @@
 Name:           pinvirt
-Version:        1.0
+Version:        1.0.1
 Release:        1%{?dist}
 Summary:        CPU Pinning Manager for Virtual Machines (Pinvirt)
 
