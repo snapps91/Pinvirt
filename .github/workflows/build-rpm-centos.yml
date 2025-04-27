@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: oraclelinux:latest 
+      image: oraclelinux:8
       options: --privileged 
 
     steps:
