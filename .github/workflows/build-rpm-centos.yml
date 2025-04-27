@@ -23,8 +23,8 @@ jobs:
 
       - name: Prepare sources
         run: |
-          cp pinvirt.py ~/rpmbuild/SOURCES/
-          cp packaging/pinvirt.spec ~/rpmbuild/SPECS/
+          cp src/pinvirt.py ~/rpmbuild/SOURCES/
+          cp rpm/pinvirt.spec ~/rpmbuild/SPECS/
 
       - name: Build RPM
         run: |
