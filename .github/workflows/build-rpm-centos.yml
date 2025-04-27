@@ -33,6 +33,37 @@ jobs:
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pinvirt-rpms
+          name: pinvirt-rpms-ol8
           path: ~/rpmbuild/RPMS/noarch/
           if-no-files-found: error
+    build:
+      name: Build RPM on CentOS 7
+      runs-on: ubuntu-latest
+
+      container:
+        image: centos:9
+        options: --privileged 
+
+      steps:
+        - name: Checkout repository
+          uses: actions/checkout@v4
+
+        - name: Install build tools
+          run: |
+            yum install -y rpm-build rpmdevtools
+            yum install -y python3
+            rpmdev-setuptree
+
+        - name: Prepare sources
+          run: |
+            cp src/pinvirt.py ~/rpmbuild/SOURCES/
+            cp rpm/pinvirt.spec ~/rpmbuild/SPECS/
+
+        - name: Build RPM
+          run: |
+            rpmbuild -ba ~/rpmbuild/SPECS/pinvirt.spec
+
+        - name: Upload RPM artifact
+          uses: actions/upload-artifact@v4
+          with:
+            name: pinvirt-rpms-centos9
