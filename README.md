@@ -27,13 +27,13 @@ You can install **Pinvirt** by downloading the appropriate RPM package for your 
 ### Oracle Linux 8
 
 ```bash
-sudo dnf install https://github.com/snapps91/Pinvirt/releases/download/v1.0/pinvirt-1.0-1.el8.noarch.rpm
+sudo dnf install https://github.com/snapps91/Pinvirt/releases/download/v1.0.1/pinvirt-1.0.1-1.el8.noarch.rpm
 ```
 
 ### Oracle Linux 9
 
 ```bash
-sudo dnf install https://github.com/snapps91/Pinvirt/releases/download/v1.0/pinvirt-1.0-1.el9.noarch.rpm
+sudo dnf install https://github.com/snapps91/Pinvirt/releases/download/v1.0.1/pinvirt-1.0.1-1.el9.noarch.rpm
 ```
 
 ✅ After installation, you can access the CLI tool:
