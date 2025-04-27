@@ -17,7 +17,7 @@ jobs:
 
       - name: Install build tools
         run: |
-          yum install -y rpm-build rpmdevtools python3
+          dnf install -y rpm-build rpmdevtools python3
           rpmdev-setuptree
 
       - name: Prepare sources
@@ -37,11 +37,11 @@ jobs:
           if-no-files-found: error
 
   build-centos9:
-    name: Build RPM on CentOS 9
+    name: Build RPM on Rocky Linux 9
     runs-on: ubuntu-latest
 
     container:
-      image: centos:9
+      image: rockylinux:9.3.20231119-minimal
       options: --privileged 
 
     steps:
@@ -50,7 +50,7 @@ jobs:
 
       - name: Install build tools
         run: |
-          yum install -y rpm-build rpmdevtools python3
+          dnf install -y rpm-build rpmdevtools python3
           rpmdev-setuptree
 
       - name: Prepare sources
