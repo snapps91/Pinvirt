@@ -1,5 +1,7 @@
 name: Build RPM
 
+on: push
+
 jobs:
   build:
     name: Build RPM on CentOS
