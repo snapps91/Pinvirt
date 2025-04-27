@@ -3,7 +3,7 @@ name: Build RPM
 on: push
 
 jobs:
-  build:
+  build-ol8:
     name: Build RPM on Oracle Linux 8
     runs-on: ubuntu-latest
 
@@ -36,7 +36,7 @@ jobs:
           name: pinvirt-rpms-ol8
           path: ~/rpmbuild/RPMS/noarch/
           if-no-files-found: error
-    build:
+    build-centos9:
       name: Build RPM on CentOS 7
       runs-on: ubuntu-latest
 
