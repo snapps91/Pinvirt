@@ -1,113 +1,99 @@
-# oVirt - CPU Pinning Tool
+# Pinvirt
 
-**Pinvirt** is a Python tool that helps automate and manage CPU core assignments (pinning) for Virtual Machines (VMs) on a Linux host.  
-It retrieves the CPU topology using `lscpu`, manages pinning assignments via a local JSON database, and generates oVirt-compatible pinning strings.
+[![RPM Available](https://img.shields.io/badge/RPM-Available-brightgreen)](https://github.com/snapps91/Pinvirt/releases)
 
-## Features
+**Pinvirt** is a lightweight CPU Pinning Manager for Virtual Machines (VMs) on Linux systems.
 
-- Automatic vCPU to pCPU (physical CPU) allocation based on CPU topology
-- Support for multi-socket CPU environments
-- Optional hyper-threading-aware allocations
-- Manual pinning to specific logical CPUs
-- Listing of pinned VMs and available CPUs
-- Display of host CPU topology and core utilization
-- Easy removal of VM pinning records
-- Persistent storage of assignments in a local `cpu_pinning_map.json` file
+It automatically assigns logical CPUs to VMs based on the host CPU topology, supporting multi-socket and hyper-threaded configurations.
+Pinvirt also generates oVirt-compatible CPU pinning strings for seamless integration with virtualization platforms.
 
-## Requirements
+---
+
+## ✨ Features
+
+- Automatic CPU pinning based on system topology (`lscpu`)
+- Support for hyper-threading and multi-socket systems
+- Manual CPU assignment option
+- Persistent storage of CPU assignments (`cpu_pinning_map.json`)
+- Clear CLI interface for managing pinned CPUs
+- RPM packages for easy installation
+
+---
+
+## 📦 Installation
+
+You can install **Pinvirt** by downloading the appropriate RPM package for your system:
+
+### Oracle Linux 8
+
+```bash
+sudo dnf install https://github.com/snapps91/Pinvirt/releases/download/v1.0/pinvirt-1.0-1.el8.noarch.rpm
+```
+
+### Oracle Linux 9
+
+```bash
+sudo dnf install https://github.com/snapps91/Pinvirt/releases/download/v1.0/pinvirt-1.0-1.el9.noarch.rpm
+```
+
+✅ After installation, you can access the CLI tool:
+
+```bash
+pinvirt --help
+```
+
+---
+
+## 👋 Usage
+
+Pinvirt provides several commands to manage VM CPU pinning:
+
+```bash
+pinvirt --add <vm_name> <num_vcpus> <socket_id> [--multi-socket] [--use-hyperthreads]
+pinvirt --add-manual <vm_name> <cpu_list>
+pinvirt --remove <vm_name>
+pinvirt --list
+pinvirt --topology
+pinvirt --free-cpus
+pinvirt --help
+```
+
+Example: Automatically pin 4 vCPUs for a VM called "vm01" on socket 0:
+
+```bash
+pinvirt --add vm01 4 0
+```
+
+Example: Manually assign logical CPUs 1, 3, 5 to a VM called "vm02":
+
+```bash
+pinvirt --add-manual vm02 1,3,5
+```
+
+---
+
+## 🛠 Requirements
 
 - Python 3.x
-- `lscpu` command available on the system (from `util-linux` package)
+- `lscpu` (provided by the `util-linux` package)
 
-## Usage
+---
 
-```bash
-python3 pin_manager.py <command> [options]
-```
+## 📈 Roadmap
 
-### Commands
+- [x] Initial stable release
+- [x] RPM packaging for Oracle Linux 8 and 9
+- [ ] Advanced multi-socket and NUMA-aware CPU allocation
+- [ ] Direct integration with oVirt/RHV APIs
+- [ ] Support for additional Linux distributions
 
-- `--add <vm_name> <num_vcpus> <socket_id> [--multi-socket] [--use-hyperthreads]`  
-  Automatically assign logical CPUs to a new VM.
-  
-- `--add-manual <vm_name> <cpu_list>`  
-  Manually assign specific logical CPUs to a VM. Example: `"0,2,4,6"`
+---
 
-- `--remove <vm_name>`  
-  Remove a VM's pinning record and free its CPUs.
+## 🛡 License
 
-- `--list`  
-  List all currently pinned VMs and their CPU assignments.
+This project is licensed under the MIT License.
 
-- `--topology`  
-  Show the host's CPU topology and core utilization.
+---
 
-- `--free-cpus`  
-  Show the logical CPUs that are currently available.
+## 🚀 Get started with Pinvirt today and simplify your VM CPU pinning!
 
-- `--help`  
-  Show the help message.
-
-## Examples
-
-### Add a VM automatically with hyper-threading
-
-```bash
-python3 pin_manager.py --add my-vm 4 0 --use-hyperthreads
-```
-
-Assigns 4 vCPUs to `my-vm`, preferring socket 0 and using hyper-threading.
-
-### Manually pin a VM to specific CPUs
-
-```bash
-python3 pin_manager.py --add-manual my-vm "1,3,5,7"
-```
-
-Assigns logical CPUs 1, 3, 5, and 7 to `my-vm`.
-
-### List all pinned VMs
-
-```bash
-python3 pin_manager.py --list
-```
-
-### Show host CPU topology
-
-```bash
-python3 pin_manager.py --topology
-```
-
-### Remove a pinned VM
-
-```bash
-python3 pin_manager.py --remove my-vm
-```
-
-## Pinning Output Format
-
-When a VM is pinned, the tool generates an oVirt-compatible string:
-
-```
-vCPU0#pCPU0_vCPU1#pCPU1_vCPU2#pCPU2_...
-```
-
-Example output:
-
-```
-0#1_1#3_2#5_3#7
-```
-
-This string can be directly copied into the "CPU Pinning" field in oVirt.
-
-## Notes
-
-- If the CPU topology cannot be retrieved or if there are not enough CPUs available, the tool will exit with an error.
-- By default, one logical CPU per core is assigned unless `--use-hyperthreads` is specified.
-- Duplicate CPU assignments are prevented automatically.
-- Assignments are stored persistently in the local `cpu_pinning_map.json` file.
-
-## License
-
-This project is licensed under the MIT License.  
-Feel free to use, modify, and distribute it with attribution.
