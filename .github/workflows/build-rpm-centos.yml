@@ -8,8 +8,8 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: centos:8        # Oppure oraclelinux:8 per Oracle Linux
-      options: --privileged  # Serve per mock eventuale
+      image: oraclelinux:latest 
+      options: --privileged 
 
     steps:
       - name: Checkout repository
