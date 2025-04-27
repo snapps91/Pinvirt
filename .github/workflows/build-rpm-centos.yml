@@ -3,6 +3,27 @@ name: Build RPM
 on: push
 
 jobs:
+  test:
+    name: Run Python Unit Tests
+    runs-on: ubuntu-latest
+
+    container:
+      image: oraclelinux:8
+      options: --privileged
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Python and Pytest
+        run: |
+          yum install -y python3 python3-pip
+          pip3 install pytest
+
+      - name: Run tests
+        run: |
+          pytest src/test_pinvirt.py
+
   build-ol8:
     name: Build RPM on Oracle Linux 8
     runs-on: ubuntu-latest
