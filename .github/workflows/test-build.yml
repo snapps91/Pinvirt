@@ -61,7 +61,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pinvirt-rpm-ol8
-          path: $HOME/rpmbuild/RPMS/noarch/
+          path: /github/home/rpmbuild/RPMS/noarch/*.rpm 
           if-no-files-found: error
 
   build-rockylinux9:
@@ -96,5 +96,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pinvirt-rpm-el9
-          path: $HOME/rpmbuild/RPMS/noarch/
+          path: /github/home/rpmbuild/RPMS/noarch/*.rpm 
           if-no-files-found: error
