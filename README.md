@@ -1,4 +1,4 @@
-# Pinvirt
+# Pinvirt - oVirt/OLVM/RHV Cpu Pinning Tool
 
 [![RPM Available](https://img.shields.io/badge/RPM-Available-brightgreen)](https://github.com/snapps91/Pinvirt/releases)
 
