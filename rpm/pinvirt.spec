@@ -31,5 +31,7 @@ mkdir -p %{buildroot}/etc/pinvirt
 %dir /etc/pinvirt
 
 %changelog
+* Sun Apr 27 2025 Giacomo Failla <giacomo.failla@cheope.io> - 1.0.1-1
+- Defined /etc/pinvirt as the configuration directory (was missing before).
 * Sat Apr 26 2025 Giacomo Failla <giacomo.failla@cheope.io> - 1.0-1
 - Initial release of Pinvirt CPU Pinning Manager.
