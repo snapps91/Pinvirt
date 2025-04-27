@@ -14,7 +14,7 @@ import json
 # Type aliases
 CpuInfo = List[Tuple[int, int, int]]
 PinningMap = Dict[str, List[int]]
-TEST_PIN_FILE = "cpu_pinning_map.json"
+TEST_PIN_FILE = "/etc/pinvirt/cpu_pinning_map.json"
 
 
 class TestPinManager(unittest.TestCase):
