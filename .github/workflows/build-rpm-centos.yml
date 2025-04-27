@@ -18,7 +18,7 @@ jobs:
       - name: Install build tools
         run: |
           dnf install -y rpm-build rpmdevtools python3
-          rpmdev-setuptree
+          mkdir -p /root/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
       - name: Prepare sources
         run: |
