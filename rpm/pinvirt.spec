@@ -24,8 +24,11 @@ It automatically manages vCPU to pCPU mappings and generates oVirt-compatible pi
 mkdir -p %{buildroot}/usr/local/bin
 install -m 0755 %{SOURCE0} %{buildroot}/usr/local/bin/pinvirt
 
+mkdir -p %{buildroot}/etc/pinvirt
+
 %files
 /usr/local/bin/pinvirt
+%dir /etc/pinvirt
 
 %changelog
 * Sat Apr 26 2025 Giacomo Failla <giacomo.failla@cheope.io> - 1.0-1
