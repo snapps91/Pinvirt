@@ -1,0 +1,36 @@
+name: Build RPM
+
+jobs:
+  build:
+    name: Build RPM on CentOS
+    runs-on: ubuntu-latest
+
+    container:
+      image: centos:8        # Oppure oraclelinux:8 per Oracle Linux
+      options: --privileged  # Serve per mock eventuale
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          yum install -y rpm-build rpmdevtools
+          yum install -y python3
+          rpmdev-setuptree
+
+      - name: Prepare sources
+        run: |
+          cp pinvirt.py ~/rpmbuild/SOURCES/
+          cp packaging/pinvirt.spec ~/rpmbuild/SPECS/
+
+      - name: Build RPM
+        run: |
+          rpmbuild -ba ~/rpmbuild/SPECS/pinvirt.spec
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pinvirt-rpm
+          path: |
+            ~/rpmbuild/RPMS/noarch/*.rpm
