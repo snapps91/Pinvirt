@@ -17,54 +17,54 @@ jobs:
 
       - name: Install build tools
         run: |
-          yum install -y rpm-build rpmdevtools
-          yum install -y python3
+          yum install -y rpm-build rpmdevtools python3
           rpmdev-setuptree
 
       - name: Prepare sources
         run: |
-          cp src/pinvirt.py ~/rpmbuild/SOURCES/
-          cp rpm/pinvirt.spec ~/rpmbuild/SPECS/
+          cp src/pinvirt.py /root/rpmbuild/SOURCES/
+          cp rpm/pinvirt.spec /root/rpmbuild/SPECS/
 
       - name: Build RPM
         run: |
-          rpmbuild -ba ~/rpmbuild/SPECS/pinvirt.spec
+          rpmbuild -ba /root/rpmbuild/SPECS/pinvirt.spec
 
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
         with:
           name: pinvirt-rpms-ol8
-          path: ~/rpmbuild/RPMS/noarch/
+          path: /root/rpmbuild/RPMS/noarch/
           if-no-files-found: error
-          
-    build-centos9:
-      name: Build RPM on CentOS 7
-      runs-on: ubuntu-latest
 
-      container:
-        image: centos:9
-        options: --privileged 
+  build-centos9:
+    name: Build RPM on CentOS 9
+    runs-on: ubuntu-latest
 
-      steps:
-        - name: Checkout repository
-          uses: actions/checkout@v4
+    container:
+      image: centos:9
+      options: --privileged 
 
-        - name: Install build tools
-          run: |
-            yum install -y rpm-build rpmdevtools
-            yum install -y python3
-            rpmdev-setuptree
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-        - name: Prepare sources
-          run: |
-            cp src/pinvirt.py ~/rpmbuild/SOURCES/
-            cp rpm/pinvirt.spec ~/rpmbuild/SPECS/
+      - name: Install build tools
+        run: |
+          yum install -y rpm-build rpmdevtools python3
+          rpmdev-setuptree
 
-        - name: Build RPM
-          run: |
-            rpmbuild -ba ~/rpmbuild/SPECS/pinvirt.spec
+      - name: Prepare sources
+        run: |
+          cp src/pinvirt.py /root/rpmbuild/SOURCES/
+          cp rpm/pinvirt.spec /root/rpmbuild/SPECS/
 
-        - name: Upload RPM artifact
-          uses: actions/upload-artifact@v4
-          with:
-            name: pinvirt-rpms-centos9
+      - name: Build RPM
+        run: |
+          rpmbuild -ba /root/rpmbuild/SPECS/pinvirt.spec
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pinvirt-rpms-centos9
+          path: /root/rpmbuild/RPMS/noarch/
+          if-no-files-found: error
