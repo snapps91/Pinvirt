@@ -17,23 +17,23 @@ jobs:
 
       - name: Install build tools
         run: |
-          dnf install -y rpm-build rpmdevtools python3
-          mkdir -p /root/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+          yum install -y rpm-build rpmdevtools python3
+          mkdir -p $HOME/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
       - name: Prepare sources
         run: |
-          cp src/pinvirt.py /root/rpmbuild/SOURCES/
-          cp rpm/pinvirt.spec /root/rpmbuild/SPECS/
+          cp src/pinvirt.py $HOME/rpmbuild/SOURCES/
+          cp rpm/pinvirt.spec $HOME/rpmbuild/SPECS/
 
       - name: Build RPM
         run: |
-          rpmbuild -ba /root/rpmbuild/SPECS/pinvirt.spec
+          rpmbuild -ba $HOME/rpmbuild/SPECS/pinvirt.spec
 
       - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
         with:
           name: pinvirt-rpms-ol8
-          path: /root/rpmbuild/RPMS/noarch/
+          path: $HOME/rpmbuild/RPMS/noarch/
           if-no-files-found: error
 
   build-centos9:
