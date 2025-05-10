@@ -24,6 +24,11 @@ jobs:
         run: |
           yum install -y python3.11 python3-pip
           pip3 install pytest
+
+      - name: Set defult Python
+        run: |
+          alternatives --set python /usr/bin/python3.11
+          alternatives --set python3 /usr/bin/python3.11
         
       - name: Prepare etc directory
         run: |
