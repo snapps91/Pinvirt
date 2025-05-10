@@ -34,11 +34,14 @@ License:
 ================================================================================
 """
 
+from __future__ import annotations
+
 import subprocess
 import sys
 import json
 import os
 from typing import List, Tuple, Dict, Set, Optional
+import argparse
 
 PinningMap = Dict[str, List[int]]
 CpuInfo = List[Tuple[int, int, int]]  # (logical_cpu, core_id, socket_id)
@@ -120,7 +123,7 @@ def generate_cpu_allocation(
     used_cpus: Set[int],
     target_socket: Optional[int] = None,
     allow_multi_socket: bool = False,
-    use_hyperthreads: bool = False, # <-- Nuovo parametro
+    use_ht: bool = False, # <-- Nuovo parametro
 ) -> List[int]:
     """
     Allocates a list of available logical CPUs for vCPU pinning (AUTOMATIC MODE).
@@ -183,7 +186,7 @@ def generate_cpu_allocation(
     # --- Select CPUs based on the chosen strategy ---
     assigned_cpus: List[int] = []
 
-    if not use_hyperthreads:
+    if not use_ht:
         # Strategy 1: One logical CPU per physical core (Original Behavior)
         available_single_cpus = [cpus[0] for _, cpus in sorted_core_groups if cpus] # Take the first CPU from each core
         if len(available_single_cpus) < num_vcpus:
@@ -282,177 +285,212 @@ def print_cpu_topology(cpu_topology: CpuInfo, used_cpus: Set[int]) -> None:
             print(f"  Core {core_id:3d}: [{cpu_str}] {status}")
         print()
 
+# ---------------------------------------------------------------------------
+# Custom argparse *type* for "1,3,5" → [1, 3, 5]
+# ---------------------------------------------------------------------------
+def comma_separated_ints(value: str) -> List[int]:
+    """
+    Convert a comma-separated string of integers into a `list[int]`.
 
-def print_help() -> None:
-    print("""
-Usage:
-  python3 pin_manager.py <command> [options]
+    Parameters
+    ----------
+    value : str
+        The raw CLI value, e.g. "1,3,5".
 
-Commands:
-  --add <vm_name> <num_vcpus> <socket_id> [--multi-socket] [--use-hyperthreads]
-                   Automatically pin a new VM.
-                   <num_vcpus>: Number of virtual CPUs for the VM.
-                   <socket_id>: Preferred physical CPU socket (e.g., 0 or 1).
-                   --multi-socket: Allow using cores from any socket if needed.
-                   --use-hyperthreads: Assign vCPUs utilizing all threads of a
-                                       physical core before moving to the next core.
-                                       Default behavior is to use only one thread
-                                       per physical core.
+    Returns
+    -------
+    list[int]
+        A list of parsed, unique integers.
 
-  --add-manual <vm_name> <cpu_list>
-                   Manually pin a new VM to specific logical CPUs.
-                   <cpu_list>: Comma-separated list of logical CPU IDs (e.g., "1,3,5,7").
-
-  --remove <vm_name>
-                   Remove a VM's pinning record and free its CPUs.
-
-  --list           List all currently pinned VMs and their CPU assignments.
-
-  --topology       Show the host's CPU topology and which cores are in use.
-
-  --free-cpus      Show the list of logical CPUs currently not assigned to any VM.
-
-  --help           Show this help message.
-""")
-
-
-def main() -> None:
-
-    """ Verify is root user """
-    if os.geteuid() != 0:
-        print("[ERROR] This script must be run as root.")
-        sys.exit(1)
-    args: List[str] = sys.argv
-    if len(args) < 2 or args[1] == "--help":
-        print_help()
-        return
-
-    action: str = args[1]
-    pinning_data: PinningMap = load_pinning()
-    cpu_topology: CpuInfo = get_cpu_topology()
-    used_cpus: Set[int] = get_used_logical_cpus(pinning_data)
-    all_system_cpus: Set[int] = {cpu for cpu, _, _ in cpu_topology}
-
-    if action == "--add":
-        # Basic argument check
-        if len(args) < 5:
-             print("[ERROR] Missing arguments for --add.")
-             print_help()
-             sys.exit(1)
-
-        # Extract core arguments
-        vm_name: str = args[2]
-        try:
-            num_vcpus: int = int(args[3])
-            socket_id: int = int(args[4])
-            if num_vcpus <= 0:
-                 raise ValueError("Number of vCPUs must be positive.")
-        except ValueError as e:
-            print(f"[ERROR] Invalid arguments for --add: num_vcpus and socket_id must be integers. {e}")
-            sys.exit(1)
-
-        # Extract flags (handle potential position variations)
-        flags = {arg for arg in args[5:] if arg.startswith("--")}
-        allow_multi_socket: bool = "--multi-socket" in flags
-        use_hyperthreads: bool = "--use-hyperthreads" in flags # <-- Check for new flag
-
-        # Check for unknown flags/arguments
-        known_flags = {"--multi-socket", "--use-hyperthreads"}
-        unknown_args = [arg for arg in args[5:] if arg not in known_flags]
-        if unknown_args:
-             print(f"[WARN] Unknown arguments/flags provided for --add: {unknown_args}")
-             # Optionally exit or just continue
-
-        if vm_name in pinning_data:
-            print(f"[WARN] VM '{vm_name}' is already pinned: {pinning_data[vm_name]}")
-            print("Use --remove first if you want to re-pin this VM.")
-            sys.exit(1)
-
-        # Call allocation function with the new flag
-        assigned_cpus: List[int] = generate_cpu_allocation(
-            cpu_topology, num_vcpus, used_cpus, socket_id, allow_multi_socket, use_hyperthreads # Pass flag
+    Raises
+    ------
+    argparse.ArgumentTypeError
+        If the input is empty, contains duplicates, or includes
+        non-integer fragments.
+    """
+    try:
+        numbers = [int(v.strip()) for v in value.split(",") if v.strip()]
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            f"'{value}' is not a valid comma-separated sequence of integers."
         )
-        pinning_data[vm_name] = assigned_cpus # Already sorted by generate_cpu_allocation
-        save_pinning(pinning_data)
+    if not numbers:
+        raise argparse.ArgumentTypeError("The CPU list must not be empty.")
+    if len(numbers) != len(set(numbers)):
+        raise argparse.ArgumentTypeError("Duplicate CPU IDs detected.")
+    return numbers
 
-        strategy_msg = "using hyper-threads" if use_hyperthreads else "using one thread per core"
-        print(f"\n✅ Automatically pinned VM '{vm_name}' with {num_vcpus} vCPU(s) ({strategy_msg})")
-        print(f"   Assigned logical CPUs: {assigned_cpus}")
-        print("------------------------------------------------")
-        print("oVirt pinning string:")
-        print(build_ovirt_pinning_string(assigned_cpus)) # Use the sorted list
-        print("------------------------------------------------\n")
 
-    elif action == "--add-manual":
-        if len(args) != 4:
-            print("[ERROR] Incorrect number of arguments for --add-manual.")
-            print("Usage: --add-manual <vm_name> <cpu_list_string>")
-            print_help()
-            sys.exit(1)
+# ---------------------------------------------------------------------------
+# Build the root `ArgumentParser` with six sub-commands
+# ---------------------------------------------------------------------------
+def build_parser() -> argparse.ArgumentParser:
+    """
+    Create and return the top-level `ArgumentParser` with all sub-commands.
 
-        vm_name: str = args[2]
-        cpu_list_str: str = args[3]
+    Returns
+    -------
+    argparse.ArgumentParser
+    """
+    parser = argparse.ArgumentParser(
+        prog="python3 pin_manager.py",
+        description="Manage vCPU pinning for virtual machines.",
+    )
+    sub = parser.add_subparsers(
+        dest="command", required=True, metavar="<command>"
+    )
 
-        if vm_name in pinning_data:
-            print(f"[WARN] VM '{vm_name}' is already pinned: {pinning_data[vm_name]}")
-            print("Use --remove first if you want to re-pin this VM.")
-            sys.exit(1)
+    # --- add --------------------------------------------------------------
+    cmd_add = sub.add_parser("add", help="Automatically pin a new VM.")
+    cmd_add.add_argument("vm_name", help="Name of the virtual machine.")
+    cmd_add.add_argument("num_vcpus", type=int, help="Number of virtual CPUs.")
+    cmd_add.add_argument(
+        "socket_id",
+        type=int,
+        help="Preferred physical socket ID (e.g. 0 or 1).",
+    )
+    cmd_add.add_argument(
+        "--multi-socket",
+        action="store_true",
+        help="Allow cores from any socket if required.",
+    )
+    cmd_add.add_argument(
+        "--use-ht",
+        action="store_true",
+        help=(
+            "Exhaust all hyper-threads of a core before moving to the next "
+            "core (default is one thread per core)."
+        ),
+    )
 
-        try:
-            manual_cpus_str = cpu_list_str.split(',')
-            assigned_cpus_manual = sorted([int(cpu.strip()) for cpu in manual_cpus_str if cpu.strip()])
-            if not assigned_cpus_manual:
-                 raise ValueError("CPU list cannot be empty.")
-            if len(assigned_cpus_manual) != len(set(assigned_cpus_manual)):
-                 raise ValueError("Duplicate CPU IDs provided in the list.")
+    # --- add-manual -------------------------------------------------------
+    cmd_manual = sub.add_parser(
+        "add-manual", help="Manually pin a VM to specific logical CPUs."
+    )
+    cmd_manual.add_argument("vm_name", help="Name of the virtual machine.")
+    cmd_manual.add_argument(
+        "cpu_list",
+        type=comma_separated_ints,
+        metavar="<cpu1,cpu2,…>",
+        help='Comma-separated logical CPU IDs, e.g. "1,3,5".',
+    )
 
-        except ValueError as e:
-            print(f"[ERROR] Invalid CPU list format '{cpu_list_str}'. Please provide comma-separated integers (e.g., '1,3,5'). {e}")
-            sys.exit(1)
+    # --- remove -----------------------------------------------------------
+    cmd_remove = sub.add_parser("remove", help="Remove an existing pinning.")
+    cmd_remove.add_argument("vm_name", help="Name of the virtual machine.")
 
-        invalid_cpus = {cpu for cpu in assigned_cpus_manual if cpu not in all_system_cpus}
-        conflicting_cpus = {cpu for cpu in assigned_cpus_manual if cpu in used_cpus}
+    # --- informational commands ------------------------------------------
+    sub.add_parser("list", help="List all VMs and their CPU assignments.")
+    sub.add_parser("topology", help="Show host CPU topology.")
+    sub.add_parser("free-cpus", help="Show currently unassigned logical CPUs.")
 
-        error_messages = []
-        if invalid_cpus:
-            error_messages.append(f"  - The following specified CPUs do not exist on the system: {sorted(list(invalid_cpus))}")
-        if conflicting_cpus:
-            error_messages.append(f"  - The following specified CPUs are already used by other VMs: {sorted(list(conflicting_cpus))}")
+    return parser
 
-        if error_messages:
-            print("[ERROR] Cannot add VM pinning due to validation errors:")
-            for msg in error_messages:
-                print(msg)
+
+# ---------------------------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------------------------
+def main() -> None:
+    """Parse CLI arguments and dispatch to the selected sub-command."""
+    # ---------------------------------------------------------------------
+    # Safety check – root privileges are mandatory for pinning operations
+    # ---------------------------------------------------------------------
+    if os.geteuid() != 0:
+        sys.exit("[ERROR] This script must be run as root.")
+
+    parser = build_parser()
+    args = parser.parse_args()
+
+    # ---------------------------------------------------------------------
+    # Load data that most commands need only once
+    # ---------------------------------------------------------------------
+    pinning_data = load_pinning()
+    cpu_topology = get_cpu_topology()
+    used_cpus: Set[int] = get_used_logical_cpus(pinning_data)
+    system_cpus = {cpu for cpu, _, _ in cpu_topology}  # all logical CPUs
+
+    # ---------------------------------------------------------------------
+    # Command dispatcher – Python 3.10 structural pattern matching
+    # ---------------------------------------------------------------------
+    match args.command:
+        # ----------------------------- add ------------------------------
+        case "add":
+            if args.vm_name in pinning_data:
+                parser.error(f"VM '{args.vm_name}' is already pinned.")
+
+            assigned_cpus = generate_cpu_allocation(
+                cpu_topology=cpu_topology,
+                num_vcpus=args.num_vcpus,
+                used_cpus=used_cpus,
+                target_socket=args.socket_id,
+                allow_multi_socket=args.multi_socket,
+                use_ht=args.use_ht,
+            )
+            pinning_data[args.vm_name] = assigned_cpus
+            save_pinning(pinning_data)
+
+            strategy = (
+                "hyper-threads" if args.use_ht else "one thread per core"
+            )
+            print(
+                f"\n✅ VM '{args.vm_name}' pinned automatically "
+                f"({args.num_vcpus} vCPU, {strategy})"
+            )
+            print(f"   Logical CPUs: {assigned_cpus}")
+            print("------------------------------------------------")
+            print("oVirt pinning string:")
+            print(build_ovirt_pinning_string(assigned_cpus))
+            print("------------------------------------------------\n")
+
+        # -------------------------- add-manual --------------------------
+        case "add-manual":
+            if args.vm_name in pinning_data:
+                parser.error(f"VM '{args.vm_name}' is already pinned.")
+
+            invalid_cpus = {c for c in args.cpu_list if c not in system_cpus}
+            conflicting_cpus = {c for c in args.cpu_list if c in used_cpus}
+
+            if invalid_cpus or conflicting_cpus:
+                error_lines: list[str] = ["[ERROR] Validation failed:"]
+                if invalid_cpus:
+                    error_lines.append(f"  • Non-existent CPUs: {sorted(invalid_cpus)}")
+                if conflicting_cpus:
+                    error_lines.append(f"  • CPUs already in use: {sorted(conflicting_cpus)}")
+                list_available_cpus(cpu_topology, used_cpus)
+                sys.exit("\n".join(error_lines))
+
+            pinning_data[args.vm_name] = sorted(args.cpu_list)
+            save_pinning(pinning_data)
+
+            print(f"\n✅ VM '{args.vm_name}' pinned manually")
+            print(f"   Logical CPUs: {sorted(args.cpu_list)}")
+            print("------------------------------------------------")
+            print("oVirt pinning string:")
+            print(build_ovirt_pinning_string(args.cpu_list))
+            print("------------------------------------------------\n")
+
+        # ---------------------------- remove ----------------------------
+        case "remove":
+            remove_vm(args.vm_name, pinning_data)
+
+        # ----------------------------- list -----------------------------
+        case "list":
+            list_vms(pinning_data)
+
+        # --------------------------- free-cpus --------------------------
+        case "free-cpus":
             list_available_cpus(cpu_topology, used_cpus)
-            sys.exit(1)
 
-        pinning_data[vm_name] = assigned_cpus_manual
-        save_pinning(pinning_data)
+        # --------------------------- topology ---------------------------
+        case "topology":
+            print_cpu_topology(cpu_topology, used_cpus)
 
-        print(f"\n✅ Manually pinned VM '{vm_name}'")
-        print(f"   Assigned logical CPUs: {assigned_cpus_manual}")
-        print("------------------------------------------------")
-        print("oVirt pinning string:")
-        print(build_ovirt_pinning_string(assigned_cpus_manual))
-        print("------------------------------------------------\n")
-
-    elif action == "--remove" and len(args) == 3:
-        remove_vm(args[2], pinning_data)
-
-    elif action == "--list":
-        list_vms(pinning_data)
-
-    elif action == "--free-cpus":
-        list_available_cpus(cpu_topology, used_cpus)
-
-    elif action == "--topology":
-        print_cpu_topology(cpu_topology, used_cpus)
-
-    else:
-        print("[ERROR] Invalid command or arguments.")
-        print_help()
-        sys.exit(1)
+        # ---------------------------- default ---------------------------
+        case _:
+            # Should never happen due to argparse `required=True`
+            parser.error("Unrecognized command.")  # pragma: no cover
 
 
 if __name__ == "__main__":
     main()
+
