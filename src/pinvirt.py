@@ -23,7 +23,7 @@ Requirements:
 
 Usage:
   Run the script with the desired command:
-    python3 pin_manager.py --help
+   pinvirt --help
 
 Author:
   Giacomo Failla - 2025 <giacomo.failla@cheope.io>
@@ -335,7 +335,7 @@ def _positive_int(value: int, param_name: str) -> int:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="pin_manager.py",
+        prog="pinvirt",
         description=(
             "Manage vCPU pinning for virtual machines.\n\n"
             "Legacy commands prefixed by two dashes remain supported "
@@ -347,7 +347,7 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(
         dest="command",
         metavar="<command>",
-        help="Run 'pin_manager.py <command> --help' for details.",
+        help="Run 'pinvirt <command> --help' for details.",
     )
 
     # ---------------------------- add (automatic) --------------------------
