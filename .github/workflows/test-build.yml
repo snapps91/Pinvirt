@@ -20,15 +20,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Enable newer Python module and install
-        run: |
-          dnf -y module enable python311 
-          dnf -y install python311 python311-pip
-          python3.11 -m pip install --upgrade pip pytest
-
       - name: Install Python and Pytest
         run: |
-          yum install -y python3 python3-pip
+          yum install -y python3.11 python3-pip
           pip3 install pytest
         
       - name: Prepare etc directory
