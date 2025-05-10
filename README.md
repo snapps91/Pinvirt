@@ -27,13 +27,13 @@ You can install **Pinvirt** by downloading the appropriate RPM package for your 
 ### Oracle Linux 8
 
 ```bash
-sudo dnf install https://github.com/snapps91/Pinvirt/releases/download/v1.0.1/pinvirt-1.0.1-1.el8.noarch.rpm
+sudo dnf install https://github.com/snapps91/Pinvirt/releases/download/v1.1.0/pinvirt-1.1.0-2.el8.noarch.rpm
 ```
 
 ### Oracle Linux 9
 
 ```bash
-sudo dnf install https://github.com/snapps91/Pinvirt/releases/download/v1.0.1/pinvirt-1.0.1-1.el9.noarch.rpm
+sudo dnf install https://github.com/snapps91/Pinvirt/releases/download/v1.1.0/pinvirt-1.1.0-2.el9.noarch.rpm
 ```
 
 ✅ After installation, you can access the CLI tool:
@@ -49,12 +49,12 @@ pinvirt --help
 Pinvirt provides several commands to manage VM CPU pinning:
 
 ```bash
-pinvirt --add <vm_name> <num_vcpus> <socket_id> [--multi-socket] [--use-hyperthreads]
-pinvirt --add-manual <vm_name> <cpu_list>
-pinvirt --remove <vm_name>
-pinvirt --list
-pinvirt --topology
-pinvirt --free-cpus
+pinvirt add <vm_name> <num_vcpus> <socket_id> [--multi-socket] [--use-ht]
+pinvirt add-manual <vm_name> <cpu_list>
+pinvirt remove <vm_name>
+pinvirt list
+pinvirt topology
+pinvirt free-cpus
 pinvirt --help
 ```
 
@@ -96,4 +96,3 @@ This project is licensed under the MIT License.
 ---
 
 ## 🚀 Get started with Pinvirt today and simplify your VM CPU pinning!
-
