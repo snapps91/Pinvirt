@@ -34,7 +34,6 @@ License:
 ================================================================================
 """
 
-
 import argparse
 import json
 import logging
@@ -560,7 +559,7 @@ def _handle_simple(
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:
+def pinvirt() -> None:
     argv = _normalize_legacy_command(sys.argv)
     parser = _build_parser()
 
@@ -597,4 +596,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":  # pragma: no cover
-    main()
+    pinvirt()
