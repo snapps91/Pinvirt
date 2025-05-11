@@ -27,13 +27,13 @@ You can install **Pinvirt** by downloading the appropriate RPM package for your 
 ### Oracle Linux 8
 
 ```bash
-sudo dnf install https://github.com/snapps91/Pinvirt/releases/download/v1.1.0/pinvirt-1.1.0-2.el8.noarch.rpm
+sudo dnf install https://github.com/snapps91/Pinvirt/releases/download/v1.1.1/pinvirt-1.1.1-3.el8.noarch.rpm
 ```
 
 ### Oracle Linux 9
 
 ```bash
-sudo dnf install https://github.com/snapps91/Pinvirt/releases/download/v1.1.0/pinvirt-1.1.0-2.el9.noarch.rpm
+sudo dnf install https://github.com/snapps91/Pinvirt/releases/download/v1.1.1/pinvirt-1.1.1-3.el9.noarch.rpm
 ```
 
 ✅ After installation, you can access the CLI tool:
@@ -61,13 +61,13 @@ pinvirt --help
 Example: Automatically pin 4 vCPUs for a VM called "vm01" on socket 0:
 
 ```bash
-pinvirt --add vm01 4 0
+pinvirt add vm01 4 0
 ```
 
 Example: Manually assign logical CPUs 1, 3, 5 to a VM called "vm02":
 
 ```bash
-pinvirt --add-manual vm02 1,3,5
+pinvirt add-manual vm02 1,3,5
 ```
 
 ---
@@ -95,4 +95,5 @@ This project is licensed under the MIT License.
 
 ---
 
-## 🚀 Get started with Pinvirt today and simplify your VM CPU pinning!
+## Developer Guide
+TODO
