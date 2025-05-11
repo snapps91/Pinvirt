@@ -1,6 +1,6 @@
 Name:           pinvirt
-Version:        1.1.0
-Release:        2%{?dist}
+Version:        1.1.1
+Release:        3%{?dist}
 Summary:        CPU Pinning Manager for Virtual Machines (Pinvirt)
 
 License:        MIT
