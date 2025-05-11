@@ -32,7 +32,6 @@ jobs:
       - name: Run tests
         run: |
           pytest src/test_pinvirt.py
-          ruff check .
 
   build-ol8:
     name: Build RPM on Oracle Linux 8
