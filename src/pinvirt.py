@@ -202,7 +202,7 @@ def generate_cpu_allocation(
     available_sockets = {cpu.socket_id for cpu in cpu_topology}
     if (target_socket is not None) and (target_socket not in available_sockets):
         logging.error(
-            "Socket %s inesistente. Disponibili: %s",
+            "Socket %s not found. Available: %s",
             target_socket,
             sorted(available_sockets),
         )
