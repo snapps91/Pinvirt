@@ -5,9 +5,9 @@ Pinvirt
 ================================================================================
 
 Description:
-  A Python utility to automate and manage CPU core assignments (pinning) 
-  for Virtual Machines (VMs) on Linux hosts. It retrieves the CPU topology 
-  using 'lscpu', tracks VM-to-CPU mappings in a local JSON database, 
+  A Python utility to automate and manage CPU core assignments (pinning)
+  for Virtual Machines (VMs) on Linux hosts. It retrieves the CPU topology
+  using 'lscpu', tracks VM-to-CPU mappings in a local JSON database,
   and generates oVirt-compatible CPU pinning strings.
 
 Features:
@@ -34,45 +34,48 @@ License:
 ================================================================================
 """
 
-from __future__ import print_function
 
 import argparse
+import json
+import logging
+import os
 import subprocess
 import sys
-import json
-import os
-from typing import NamedTuple, List, Dict, Set, Tuple
-import logging
 from enum import IntEnum
+from typing import Dict, List, NamedTuple, Set, Tuple
 
 PinningMap = Dict[str, List[int]]
 CpuInfo = List[Tuple[int, int, int]]  # (logical_cpu, core_id, socket_id)
 
 PINNING_FILE = "/etc/pinvirt/cpu_pinning_map.json"
 
+
 class CpuAllocationError(RuntimeError):
     """Errore nel calcolo del pinning CPU."""
 
+
 class Errno(IntEnum):
-    NO_SOCKET          = 1
+    NO_SOCKET = 1
     INSUFFICIENT_CORES = 2
+
 
 class LogicalCpu(NamedTuple):
     logical_id: int
-    core_id:    int
-    socket_id:  int
+    core_id: int
+    socket_id: int
+
 
 def load_pinning() -> PinningMap:
     """Loads the CPU pinning data from the local JSON file."""
     if not os.path.exists(PINNING_FILE):
         return {}
     try:
-        with open(PINNING_FILE, "r") as file:
+        with open(PINNING_FILE) as file:
             return json.load(file)
     except json.JSONDecodeError:
         print(f"[ERROR] Could not decode {PINNING_FILE}. Assuming empty.")
         return {}
-    except IOError as e:
+    except OSError as e:
         print(f"[ERROR] Could not read {PINNING_FILE}: {e}")
         return {}
 
@@ -82,7 +85,7 @@ def save_pinning(data: PinningMap) -> None:
     try:
         with open(PINNING_FILE, "w") as file:
             json.dump(data, file, indent=2)
-    except IOError as e:
+    except OSError as e:
         print(f"[ERROR] Could not write to {PINNING_FILE}: {e}")
         sys.exit(1)
 
@@ -94,7 +97,9 @@ def get_cpu_topology() -> CpuInfo:
             ["lscpu", "-p=CPU,CORE,SOCKET"], universal_newlines=True
         )
     except FileNotFoundError:
-        print("[ERROR] `lscpu` command not found. Please ensure it's installed and in PATH.")
+        print(
+            "[ERROR] `lscpu` command not found. Please ensure it's installed and in PATH."
+        )
         sys.exit(1)
     except subprocess.SubprocessError as e:
         print(f"[ERROR] Failed to run lscpu: {e}")
@@ -110,7 +115,7 @@ def get_cpu_topology() -> CpuInfo:
         if len(parts) == 3:
             try:
                 logical_cpu, core_id, socket_id = map(int, parts)
-                if logical_cpu not in parsed_cpus:          # evita duplicati
+                if logical_cpu not in parsed_cpus:  # evita duplicati
                     topology.append(LogicalCpu(logical_cpu, core_id, socket_id))
                     parsed_cpus.add(logical_cpu)
             except ValueError:
@@ -132,17 +137,20 @@ def get_used_logical_cpus(pinning_data: PinningMap) -> Set[int]:
 
 
 def generate_cpu_allocation(
-    cpu_topology,              # Iterable[LogicalCpu]
-    num_vcpus,                 # int
-    used_cpus,                 # Set[int]
-    target_socket=None,        # Optional[int]
+    cpu_topology,  # Iterable[LogicalCpu]
+    num_vcpus,  # int
+    used_cpus,  # Set[int]
+    target_socket=None,  # Optional[int]
     allow_multi_socket=False,  # bool
-    use_hyperthreads=False     # bool
+    use_hyperthreads=False,  # bool
 ):
     available_sockets = {cpu.socket_id for cpu in cpu_topology}
     if (target_socket is not None) and (target_socket not in available_sockets):
-        logging.error("Socket %s inesistente. Disponibili: %s",
-                      target_socket, sorted(available_sockets))
+        logging.error(
+            "Socket %s inesistente. Disponibili: %s",
+            target_socket,
+            sorted(available_sockets),
+        )
         raise CpuAllocationError(Errno.NO_SOCKET)
 
     available_cores = {}  # type: Dict[Tuple[int, int], List[int]]
@@ -150,9 +158,11 @@ def generate_cpu_allocation(
     for cpu in cpu_topology:
         if cpu.logical_id in used_cpus:
             continue
-        if (target_socket is not None and
-            not allow_multi_socket and
-            cpu.socket_id != target_socket):
+        if (
+            target_socket is not None
+            and not allow_multi_socket
+            and cpu.socket_id != target_socket
+        ):
             continue
 
         key = (cpu.socket_id, cpu.core_id)
@@ -163,7 +173,7 @@ def generate_cpu_allocation(
 
     def core_sort_key(item):
         (socket_id, core_id), _ = item
-        preferred = (target_socket is not None and socket_id == target_socket)
+        preferred = target_socket is not None and socket_id == target_socket
         return (0 if preferred else 1, socket_id, core_id)
 
     sorted_core_groups = sorted(available_cores.items(), key=core_sort_key)
@@ -173,15 +183,21 @@ def generate_cpu_allocation(
     if not use_hyperthreads:
         single_threads = [cpus[0] for _, cpus in sorted_core_groups]
         if len(single_threads) < num_vcpus:
-            logging.error("Insufficient physical cores: required %s, available %s",
-                          num_vcpus, len(single_threads))
+            logging.error(
+                "Insufficient physical cores: required %s, available %s",
+                num_vcpus,
+                len(single_threads),
+            )
             raise CpuAllocationError(Errno.INSUFFICIENT_CORES)
         assigned = single_threads[:num_vcpus]
     else:
         total_logical = sum(len(cpus) for cpus in available_cores.values())
         if total_logical < num_vcpus:
-            logging.error("Insufficient logical cpu: requests %s, available %s",
-                          num_vcpus, total_logical)
+            logging.error(
+                "Insufficient logical cpu: requests %s, available %s",
+                num_vcpus,
+                total_logical,
+            )
             raise CpuAllocationError(Errno.INSUFFICIENT_CORES)
 
         for _, cpus in sorted_core_groups:
@@ -191,6 +207,7 @@ def generate_cpu_allocation(
             assigned.extend(cpus[:need])
 
     return sorted(assigned)
+
 
 def build_ovirt_pinning_string(assigned_cpus: List[int]) -> str:
     """Formats a list of logical CPUs into a pinning string compatible with oVirt."""
@@ -233,14 +250,18 @@ def remove_vm(vm_name: str, pinning_data: PinningMap) -> None:
 
 def print_cpu_topology(cpu_topology: CpuInfo, used_cpus: Set[int]) -> None:
     print("\n Host CPU Topology (Logical CPUs per Physical Core)")
-    print(" Status: ✅ = Core fully available | ❌ = Core partially/fully used | * = CPU assigned")
+    print(
+        " Status: ✅ = Core fully available | ❌ = Core partially/fully used | * = CPU assigned"
+    )
     print("-------------------------------------------------------------")
 
     topology_map: Dict[int, Dict[int, List[int]]] = {}
     all_logical_cpus: Set[int] = set()
 
     for logical_cpu, core_id, socket_id in cpu_topology:
-        topology_map.setdefault(socket_id, {}).setdefault(core_id, []).append(logical_cpu)
+        topology_map.setdefault(socket_id, {}).setdefault(core_id, []).append(
+            logical_cpu
+        )
         all_logical_cpus.add(logical_cpu)
 
     for socket_id in sorted(topology_map):
@@ -251,12 +272,13 @@ def print_cpu_topology(cpu_topology: CpuInfo, used_cpus: Set[int]) -> None:
             status = "❌" if core_used else "✅"
             cpu_strs = []
             for cpu in logicals:
-                 marker = "*" if cpu in used_cpus else " "
-                 cpu_strs.append(f"{cpu:3d}{marker}")
+                marker = "*" if cpu in used_cpus else " "
+                cpu_strs.append(f"{cpu:3d}{marker}")
 
             cpu_str = "][".join(cpu_strs)
             print(f"  Core {core_id:3d}: [{cpu_str}] {status}")
         print()
+
 
 # ---------------------------------------------------------------------------
 # Backwards‑compatibility layer
@@ -289,6 +311,7 @@ def _normalize_legacy_command(argv: List[str]) -> List[str]:
 # Helper utilities
 # ---------------------------------------------------------------------------
 
+
 def require_root() -> None:
     """Abort execution if the current user is not *root*."""
     if os.geteuid() != 0:
@@ -298,7 +321,7 @@ def require_root() -> None:
 def _positive_int(value: int, param_name: str) -> int:
     """Ensure *value* is strictly positive, otherwise exit with error."""
     if value <= 0:
-        sys.exit("[ERROR] {} must be a positive integer.".format(param_name))
+        sys.exit(f"[ERROR] {param_name} must be a positive integer.")
     return value
 
 
@@ -306,12 +329,11 @@ def _positive_int(value: int, param_name: str) -> int:
 # Argument‑parser construction
 # ---------------------------------------------------------------------------
 
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="pinvirt",
-        description=(
-            "Manage vCPU pinning for virtual machines.\n\n"
-        ),
+        description=("Manage vCPU pinning for virtual machines.\n\n"),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
@@ -360,9 +382,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # ------------------------ simple information ---------------------------
     subparsers.add_parser("list", help="List all pinned VMs.")
     subparsers.add_parser("topology", help="Show host CPU topology.")
-    subparsers.add_parser(
-        "free-cpus", help="Show logical CPUs not assigned to any VM."
-    )
+    subparsers.add_parser("free-cpus", help="Show logical CPUs not assigned to any VM.")
     subparsers.add_parser("help", help="Show this help message and exit.")
 
     return parser
@@ -372,14 +392,16 @@ def _build_parser() -> argparse.ArgumentParser:
 # Command handlers
 # ---------------------------------------------------------------------------
 
+
 def _handle_add(args: argparse.Namespace, pinning_data: "PinningMap") -> None:
     _positive_int(args.num_vcpus, "num_vcpus")
 
     vm_name = args.vm_name
     if vm_name in pinning_data:
         sys.exit(
-            "[ERROR] VM '{}' is already pinned. Run 'remove' first to re‑pin."
-            .format(vm_name)
+            "[ERROR] VM '{}' is already pinned. Run 'remove' first to re‑pin.".format(
+                vm_name
+            )
         )
 
     cpu_topology = get_cpu_topology()
@@ -397,12 +419,12 @@ def _handle_add(args: argparse.Namespace, pinning_data: "PinningMap") -> None:
     pinning_data[vm_name] = assigned_cpus
     save_pinning(pinning_data)
 
-    strategy_msg = (
-        "using hyper‑threads" if args.use_ht else "using one thread per core"
+    strategy_msg = "using hyper‑threads" if args.use_ht else "using one thread per core"
+    print(
+        "\n✅  Automatically pinned VM '{}' with {} vCPU(s) ({})".format(
+            vm_name, args.num_vcpus, strategy_msg
+        )
     )
-    print("\n✅  Automatically pinned VM '{}' with {} vCPU(s) ({})".format(
-        vm_name, args.num_vcpus, strategy_msg
-    ))
     print("   Assigned logical CPUs:", assigned_cpus)
     print("------------------------------------------------")
     print("oVirt pinning string:")
@@ -414,15 +436,18 @@ def _handle_add_manual(args: argparse.Namespace, pinning_data: "PinningMap") -> 
     vm_name = args.vm_name
     if vm_name in pinning_data:
         sys.exit(
-            "[ERROR] VM '{}' is already pinned. Run 'remove' first to re‑pin."
-            .format(vm_name)
+            "[ERROR] VM '{}' is already pinned. Run 'remove' first to re‑pin.".format(
+                vm_name
+            )
         )
 
     # Parse and validate the CPU list
     try:
-        assigned_cpus = sorted(int(cpu.strip()) for cpu in args.cpu_list.split(',') if cpu.strip())
+        assigned_cpus = sorted(
+            int(cpu.strip()) for cpu in args.cpu_list.split(",") if cpu.strip()
+        )
     except ValueError:
-        sys.exit("[ERROR] Invalid CPU list '{}'. Expected integers.".format(args.cpu_list))
+        sys.exit(f"[ERROR] Invalid CPU list '{args.cpu_list}'. Expected integers.")
 
     if not assigned_cpus:
         sys.exit("[ERROR] CPU list cannot be empty.")
@@ -448,7 +473,7 @@ def _handle_add_manual(args: argparse.Namespace, pinning_data: "PinningMap") -> 
     pinning_data[vm_name] = assigned_cpus
     save_pinning(pinning_data)
 
-    print("\n✅  Manually pinned VM '{}'".format(vm_name))
+    print(f"\n✅  Manually pinned VM '{vm_name}'")
     print("   Assigned logical CPUs:", assigned_cpus)
     print("------------------------------------------------")
     print("oVirt pinning string:")
@@ -460,7 +485,9 @@ def _handle_remove(args: argparse.Namespace, pinning_data: "PinningMap") -> None
     remove_vm(args.vm_name, pinning_data)
 
 
-def _handle_simple(command: str, cpu_topology: "CpuInfo", pinning_data: "PinningMap") -> None:
+def _handle_simple(
+    command: str, cpu_topology: "CpuInfo", pinning_data: "PinningMap"
+) -> None:
     used_cpus = get_used_logical_cpus(pinning_data)
 
     if command == "list":
@@ -470,12 +497,13 @@ def _handle_simple(command: str, cpu_topology: "CpuInfo", pinning_data: "Pinning
     elif command == "topology":
         print_cpu_topology(cpu_topology, used_cpus)
     else:  # pragma: no cover – should never happen
-        sys.exit("[BUG] Unhandled simple command: {}".format(command))
+        sys.exit(f"[BUG] Unhandled simple command: {command}")
 
 
 # ---------------------------------------------------------------------------
 # Main entry‑point
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     argv = _normalize_legacy_command(sys.argv)
