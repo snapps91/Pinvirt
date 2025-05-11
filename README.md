@@ -83,9 +83,7 @@ pinvirt add-manual vm02 1,3,5
 
 - [x] Initial stable release
 - [x] RPM packaging for Oracle Linux 8 and 9
-- [ ] Advanced multi-socket and NUMA-aware CPU allocation
 - [ ] Direct integration with oVirt/RHV APIs
-- [ ] Support for additional Linux distributions
 
 ---
 
