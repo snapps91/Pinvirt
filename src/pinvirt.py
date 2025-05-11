@@ -50,7 +50,7 @@ PINNING_FILE = "/etc/pinvirt/cpu_pinning_map.json"
 
 
 class CpuAllocationError(RuntimeError):
-    """Errore nel calcolo del pinning CPU."""
+    """Error in calculating the Pinning CPU."""
 
 
 class Errno(IntEnum):
@@ -72,10 +72,14 @@ def load_pinning() -> PinningMap:
         with open(PINNING_FILE) as file:
             return json.load(file)
     except json.JSONDecodeError:
-        print(f"[ERROR] Could not decode {PINNING_FILE}. Assuming empty.")
+        logging.error(
+            "Invalid JSON format in %s. Assuming empty pinning data.", PINNING_FILE
+        )
         return {}
     except OSError as e:
-        print(f"[ERROR] Could not read {PINNING_FILE}: {e}")
+        logging.error(
+            "Failed to read %s: %s. Assuming empty pinning data.", PINNING_FILE, e
+        )
         return {}
 
 
@@ -85,7 +89,9 @@ def save_pinning(data: PinningMap) -> None:
         with open(PINNING_FILE, "w") as file:
             json.dump(data, file, indent=2)
     except OSError as e:
-        print(f"[ERROR] Could not write to {PINNING_FILE}: {e}")
+        logging.error(
+            "Failed to write pinning data to %s: %s", PINNING_FILE, e
+        )
         sys.exit(1)
 
 
@@ -96,12 +102,15 @@ def get_cpu_topology() -> CpuInfo:
             ["lscpu", "-p=CPU,CORE,SOCKET"], universal_newlines=True
         )
     except FileNotFoundError:
-        print(
-            "[ERROR] `lscpu` command not found. Please ensure it's installed and in PATH."
+        logging.error(
+            "Failed to run `lscpu`: command not found. Ensure it's installed."
         )
         sys.exit(1)
     except subprocess.SubprocessError as e:
-        print(f"[ERROR] Failed to run lscpu: {e}")
+        logging.error(
+            "Failed to run `lscpu`: %s. Ensure it's installed and accessible.",
+            e,
+        )
         sys.exit(1)
 
     topology: CpuInfo = []
@@ -118,10 +127,14 @@ def get_cpu_topology() -> CpuInfo:
                     topology.append(LogicalCpu(logical_cpu, core_id, socket_id))
                     parsed_cpus.add(logical_cpu)
             except ValueError:
-                print(f"[WARN] Skipping invalid line in lscpu output: {line}")
+                logging.warning(
+                    "Skipping invalid line in lscpu output: %s", line
+                )
 
     if not topology:
-        print("[ERROR] Could not parse any CPU topology information from lscpu.")
+        logging.error(
+            "No valid CPU topology information found in lscpu output."
+        )
         sys.exit(1)
 
     return topology
@@ -242,7 +255,8 @@ def generate_cpu_allocation(
                 num_vcpus,
                 len(single_threads),
             )
-            raise CpuAllocationError(Errno.INSUFFICIENT_CORES)
+            sys.exit(1)
+            #raise CpuAllocationError(Errno.INSUFFICIENT_CORES)
         assigned = single_threads[:num_vcpus]
     else:
         total_logical = sum(len(cpus) for cpus in available_cores.values())
@@ -252,7 +266,8 @@ def generate_cpu_allocation(
                 num_vcpus,
                 total_logical,
             )
-            raise CpuAllocationError(Errno.INSUFFICIENT_CORES)
+            sys.exit(1)
+            #raise CpuAllocationError(Errno.INSUFFICIENT_CORES)
 
         for _, cpus in sorted_core_groups:
             need = num_vcpus - len(assigned)
@@ -369,13 +384,16 @@ def _normalize_legacy_command(argv: List[str]) -> List[str]:
 def require_root() -> None:
     """Abort execution if the current user is not *root*."""
     if os.geteuid() != 0:
-        sys.exit("[ERROR] This script must be run as root.")
+        logging.error(
+            "This script must be run as root. Please use 'sudo' or run as root."
+        )
+        sys.exit(1)
 
 
 def _positive_int(value: int, param_name: str) -> int:
     """Ensure *value* is strictly positive, otherwise exit with error."""
     if value <= 0:
-        sys.exit(f"[ERROR] {param_name} must be a positive integer.")
+        logging.error("%s must be a positive integer.", param_name)
     return value
 
 
@@ -452,11 +470,10 @@ def _handle_add(args: argparse.Namespace, pinning_data: "PinningMap") -> None:
 
     vm_name = args.vm_name
     if vm_name in pinning_data:
-        sys.exit(
-            "[ERROR] VM '{}' is already pinned. Run 'remove' first to re‑pin.".format(
-                vm_name
-            )
+        logging.error(
+            "VM '%s' is already pinned. Run 'remove' first to re‑pin.", vm_name
         )
+        sys.exit(1)
 
     cpu_topology = get_cpu_topology()
     used_cpus = get_used_logical_cpus(pinning_data)
@@ -489,11 +506,10 @@ def _handle_add(args: argparse.Namespace, pinning_data: "PinningMap") -> None:
 def _handle_add_manual(args: argparse.Namespace, pinning_data: "PinningMap") -> None:
     vm_name = args.vm_name
     if vm_name in pinning_data:
-        sys.exit(
-            "[ERROR] VM '{}' is already pinned. Run 'remove' first to re‑pin.".format(
-                vm_name
-            )
+        logging.error(
+            "VM '%s' is already pinned. Run 'remove' first to re‑pin.", vm_name
         )
+        sys.exit(1)
 
     # Parse and validate the CPU list
     try:
@@ -501,12 +517,20 @@ def _handle_add_manual(args: argparse.Namespace, pinning_data: "PinningMap") -> 
             int(cpu.strip()) for cpu in args.cpu_list.split(",") if cpu.strip()
         )
     except ValueError:
-        sys.exit(f"[ERROR] Invalid CPU list '{args.cpu_list}'. Expected integers.")
+        logging.error(
+            "Invalid CPU list '%s'. Expected a comma-separated list of integers.",
+            args.cpu_list,
+        )
+        sys.exit(1)
 
     if not assigned_cpus:
-        sys.exit("[ERROR] CPU list cannot be empty.")
+        logging.error("CPU list cannot be empty.")
+        sys.exit(1)
     if len(assigned_cpus) != len(set(assigned_cpus)):
-        sys.exit("[ERROR] Duplicate CPU IDs detected in the list.")
+        logging.error(
+            "Duplicate CPU IDs detected in the list: %s", assigned_cpus
+        )
+        sys.exit(1)
 
     cpu_topology = get_cpu_topology()
     all_system_cpus = {cpu for cpu, _, _ in cpu_topology}
