@@ -255,8 +255,7 @@ def generate_cpu_allocation(
                 num_vcpus,
                 len(single_threads),
             )
-            sys.exit(1)
-            #raise CpuAllocationError(Errno.INSUFFICIENT_CORES)
+            raise CpuAllocationError(Errno.INSUFFICIENT_CORES)
         assigned = single_threads[:num_vcpus]
     else:
         total_logical = sum(len(cpus) for cpus in available_cores.values())
@@ -266,8 +265,7 @@ def generate_cpu_allocation(
                 num_vcpus,
                 total_logical,
             )
-            sys.exit(1)
-            #raise CpuAllocationError(Errno.INSUFFICIENT_CORES)
+            raise CpuAllocationError(Errno.INSUFFICIENT_CORES)
 
         for _, cpus in sorted_core_groups:
             need = num_vcpus - len(assigned)
