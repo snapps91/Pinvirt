@@ -144,6 +144,61 @@ def generate_cpu_allocation(
     allow_multi_socket=False,  # bool
     use_hyperthreads=False,  # bool
 ):
+    """
+    Allocate logical CPUs for *vCPU pinning*.
+
+    The function picks a set of free logical-CPU IDs that satisfy the requested
+    **num_vcpus** while honouring NUMA locality, hyper-threading preferences
+    and any CPUs that are already taken by other virtual machines.
+
+    Parameters
+    ----------
+    cpu_topology : Iterable[LogicalCpu]
+        Sequence of :class:`LogicalCpu` records describing the host’s
+        *(logical-id, core-id, socket-id)* layout.
+    num_vcpus : int
+        Number of vCPUs to allocate for the new VM (must be > 0).
+    used_cpus : Set[int]
+        Logical CPU IDs that are already assigned to other VMs – they are
+        excluded from the search space.
+    target_socket : int, optional
+        Socket to *prefer* for the allocation.  If ``None`` (default) any
+        socket may be used.  When a socket is supplied **and**
+        ``allow_multi_socket`` is *False*, the allocator will **not** cross
+        NUMA nodes; it will raise an error instead if the request cannot be
+        satisfied.
+    allow_multi_socket : bool, default ``False``
+        If *True* and the preferred socket runs out of capacity, the allocator
+        may “spill over’’ to other sockets.
+    use_hyperthreads : bool, default ``False``
+        Allocation strategy:
+
+        * ``False`` – take **one** logical thread per core (original behaviour).
+        * ``True``  – exhaust *all* hyper-threads of a core before moving on,
+          which keeps vCPUs on as few physical cores as possible.
+
+    Returns
+    -------
+    List[int]
+        Sorted list of logical CPU IDs chosen for the VM.
+
+    Raises
+    ------
+    CpuAllocationError
+        Raised with:
+
+        * ``Errno.NO_SOCKET`` if *target_socket* does not exist.
+        * ``Errno.INSUFFICIENT_CORES`` when the host lacks enough free
+          physical/logical CPUs given the current strategy.
+
+    Notes
+    -----
+    *The function is side-effect free*: it only returns a list; it does not
+    persist or mutate any external state.  Callers are responsible for storing
+    the result (e.g. in the JSON pinning map) and for applying it to the
+    hypervisor/manager (oVirt, libvirt, etc.).
+    """
+
     available_sockets = {cpu.socket_id for cpu in cpu_topology}
     if (target_socket is not None) and (target_socket not in available_sockets):
         logging.error(
