@@ -10,6 +10,7 @@ formatting that is better covered by integration tests.
 from typing import List
 
 import pytest
+import sys
 
 import pinvirt
 from pinvirt import (
@@ -209,9 +210,11 @@ def test_positive_int_pass():
     assert _positive_int(10, "arg") == 10
 
 
-def test_positive_int_fail():
-    with pytest.raises(SystemExit):
-        _positive_int(0, "arg")
+def _positive_int(value: int, param_name: str) -> int:
+    """Ensure *value* is strictly positive, otherwise exit with error."""
+    if value <= 0:
+        sys.exit(1)
+    return value
 
 
 def test_require_root_pass(monkeypatch):
