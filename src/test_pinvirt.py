@@ -6,6 +6,7 @@ The suite targets pure functions only; end-to-end CLI tests are omitted
 because they depend on root privileges, real `lscpu` output and stdout
 formatting that is better covered by integration tests.
 """
+
 from typing import List
 
 import pytest
