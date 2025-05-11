@@ -6,33 +6,31 @@ The suite targets pure functions only; end-to-end CLI tests are omitted
 because they depend on root privileges, real `lscpu` output and stdout
 formatting that is better covered by integration tests.
 """
-import json
-import os
-import tempfile
-from typing import Dict, List, Set
+from typing import List
 
 import pytest
 
 import pinvirt
 from pinvirt import (
-    LogicalCpu,
     CpuAllocationError,
     Errno,
-    generate_cpu_allocation,
-    build_ovirt_pinning_string,
-    get_used_logical_cpus,
-    get_cpu_topology,
-    load_pinning,
-    save_pinning,
+    LogicalCpu,
     _normalize_legacy_command,
     _positive_int,
-    require_root,
+    build_ovirt_pinning_string,
+    generate_cpu_allocation,
+    get_cpu_topology,
+    get_used_logical_cpus,
+    load_pinning,
     remove_vm,
+    require_root,
+    save_pinning,
 )
 
 # ---------------------------------------------------------------------------
 # Fixtures & helpers
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def sample_topology() -> List[LogicalCpu]:
@@ -45,11 +43,15 @@ def sample_topology() -> List[LogicalCpu]:
     """
     return [
         # Socket 0
-        LogicalCpu(0, 0, 0), LogicalCpu(16, 0, 0),
-        LogicalCpu(1, 1, 0), LogicalCpu(17, 1, 0),
+        LogicalCpu(0, 0, 0),
+        LogicalCpu(16, 0, 0),
+        LogicalCpu(1, 1, 0),
+        LogicalCpu(17, 1, 0),
         # Socket 1
-        LogicalCpu(2, 0, 1), LogicalCpu(18, 0, 1),
-        LogicalCpu(3, 1, 1), LogicalCpu(19, 1, 1),
+        LogicalCpu(2, 0, 1),
+        LogicalCpu(18, 0, 1),
+        LogicalCpu(3, 1, 1),
+        LogicalCpu(19, 1, 1),
     ]
 
 
@@ -68,6 +70,7 @@ def pinning_file_tmp(tmp_path, monkeypatch):
 # generate_cpu_allocation
 # ---------------------------------------------------------------------------
 
+
 def test_basic_allocation_one_thread(sample_topology):
     """Default policy: one logical per core on preferred socket."""
     result = generate_cpu_allocation(
@@ -79,13 +82,13 @@ def test_basic_allocation_one_thread(sample_topology):
     )
     assert result == [0, 1]
 
+
 def test_insufficient_physical_cores(sample_topology):
     # both threads of both cores on socket-0 are busy
     used = {0, 16, 1, 17}
     with pytest.raises(CpuAllocationError) as exc:
         generate_cpu_allocation(
-            sample_topology, 2, used,
-            target_socket=0, allow_multi_socket=False
+            sample_topology, 2, used, target_socket=0, allow_multi_socket=False
         )
     assert exc.value.args[0] is Errno.INSUFFICIENT_CORES
 
@@ -94,10 +97,9 @@ def test_multi_socket_fallback(sample_topology):
     # no remaining cores on socket-0 → must fall back to socket-1
     used = {0, 16, 1, 17}
     result = generate_cpu_allocation(
-        sample_topology, 2, used,
-        target_socket=0, allow_multi_socket=True
+        sample_topology, 2, used, target_socket=0, allow_multi_socket=True
     )
-    assert result == [2, 3]      # first physical cores on socket-1
+    assert result == [2, 3]  # first physical cores on socket-1
 
 
 def test_hyperthread_strategy(sample_topology):
@@ -108,7 +110,7 @@ def test_hyperthread_strategy(sample_topology):
         set(),
         target_socket=0,
         allow_multi_socket=False,
-        use_hyperthreads=True
+        use_hyperthreads=True,
     )
     # Expected order: 0,16 from core(0,0) then 1 from core(0,1)
     assert result == [0, 1, 16]
@@ -124,6 +126,7 @@ def test_invalid_socket_id(sample_topology):
 # build_ovirt_pinning_string
 # ---------------------------------------------------------------------------
 
+
 def test_build_ovirt_pinning_string():
     cpus = [7, 3, 1]
     assert build_ovirt_pinning_string(cpus) == "0#1_1#3_2#7"
@@ -132,6 +135,7 @@ def test_build_ovirt_pinning_string():
 # ---------------------------------------------------------------------------
 # get_used_logical_cpus
 # ---------------------------------------------------------------------------
+
 
 def test_get_used_logical_cpus():
     mapping = {"vmA": [0, 1], "vmB": [4, 5]}
@@ -150,11 +154,10 @@ LSCPU_FAKE_OUTPUT = """\
 17,1,0
 """
 
+
 def test_get_cpu_topology_success(monkeypatch):
     monkeypatch.setattr(
-        pinvirt.subprocess,
-        "check_output",
-        lambda *_, **__: LSCPU_FAKE_OUTPUT
+        pinvirt.subprocess, "check_output", lambda *_, **__: LSCPU_FAKE_OUTPUT
     )
     topo = get_cpu_topology()
     assert topo == [
@@ -168,6 +171,7 @@ def test_get_cpu_topology_success(monkeypatch):
 def test_get_cpu_topology_command_not_found(monkeypatch):
     def raise_fn(*_a, **_kw):
         raise FileNotFoundError
+
     monkeypatch.setattr(pinvirt.subprocess, "check_output", raise_fn)
     with pytest.raises(SystemExit):
         get_cpu_topology()
@@ -176,6 +180,7 @@ def test_get_cpu_topology_command_not_found(monkeypatch):
 # ---------------------------------------------------------------------------
 # load_pinning / save_pinning
 # ---------------------------------------------------------------------------
+
 
 def test_load_and_save_pinning(pinning_file_tmp):
     data_in = {"vmX": [1, 2, 3]}
@@ -192,6 +197,7 @@ def test_load_pinning_missing_file(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 # helper utilities
 # ---------------------------------------------------------------------------
+
 
 def test_normalize_legacy_command():
     argv = ["pinvirt", "--add", "vm1", "2", "0"]
@@ -221,6 +227,7 @@ def test_require_root_fail(monkeypatch):
 # ---------------------------------------------------------------------------
 # remove_vm
 # ---------------------------------------------------------------------------
+
 
 def test_remove_vm(pinning_file_tmp, capsys):
     pinning = {"vmY": [0, 1]}
