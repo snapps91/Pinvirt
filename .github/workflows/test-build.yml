@@ -23,7 +23,7 @@ jobs:
       - name: Install Python and Pytest
         run: |
           yum install -y python3 python3-pip
-          pip3 install pytest
+          pip3 install pytest ruff
 
       - name: Prepare etc directory
         run: |
@@ -32,6 +32,7 @@ jobs:
       - name: Run tests
         run: |
           pytest src/test_pinvirt.py
+          ruff check .
 
   build-ol8:
     name: Build RPM on Oracle Linux 8
