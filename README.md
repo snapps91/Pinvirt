@@ -2,12 +2,18 @@
 
 [![RPM Available](https://img.shields.io/badge/RPM-Available-brightgreen)](https://github.com/snapps91/Pinvirt/releases) [![Test and Build RPM](https://github.com/snapps91/Pinvirt/actions/workflows/test-build.yml/badge.svg)](https://github.com/snapps91/Pinvirt/actions/workflows/test-build.yml)
 
-**Pinvirt** is a lightweight CPU Pinning Manager for Virtual Machines (VMs) on Linux systems.
+Pinvirt is a lightweight CPU pinning manager for virtual machines (VMs) orchestrated by oVirt, OLVM, and RHV.
+It automatically assigns logical CPUs to VMs based on the host CPU topology, supporting multi-socket and hyper-threading configurations.
 
-It automatically assigns logical CPUs to VMs based on the host CPU topology, supporting multi-socket and hyper-threaded configurations.
-Pinvirt also generates oVirt-compatible CPU pinning strings for seamless integration with virtualization platforms.
+Pinvirt generates oVirt-compatible CPU pinning strings, enabling seamless integration with virtualization platforms.
 
----
+The logical CPUs assigned to each VM are stored in a JSON file, allowing you to keep track of the allocations over time. Unfortunately, oVirt does not provide a native way to retrieve this information once configured.
+
+PERSONAL NOTE:
+
+*In the future, it would be great to support the full range of oVirt CPU pinning string features ([link](https://www.ovirt.org/develop/sla/cpu-pinning.html)) and integrate directly with oVirt using the native SDK — but realistically, I might never get around to it due to lack of time.*
+
+> *A similar tool might be olvm-vmcontrol (I haven’t looked into it deeply), but as far as I know, it doesn’t offer customization options for vCPU configurations.*
 
 ## ✨ Features
 
@@ -96,8 +102,7 @@ This prevents workloads from being migrated to less performant or shared cores.
 
 In NUMA systems, assigning CPU and RAM within the correct NUMA node helps avoid latency caused by remote memory access.
 
- **Infrastructure as Code / DevOps Automation**
-
+**Infrastructure as Code / DevOps Automation**
 Can be integrated into provisioning toolchains (e.g., Ansible, Terraform) to automate the setup of high-performance VMs.
 
 **Compliance / Audit / Technical Documentation**
@@ -121,4 +126,6 @@ This project is licensed under the MIT License.
 ---
 
 ## Developer Guide
+
 TODO
+
