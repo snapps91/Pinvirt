@@ -41,13 +41,26 @@ import subprocess
 import sys
 import json
 import os
-from typing import List, Tuple, Dict, Set, Optional
+from typing import NamedTuple, List, Dict, Set, Tuple
+import logging
+from enum import IntEnum
 
 PinningMap = Dict[str, List[int]]
 CpuInfo = List[Tuple[int, int, int]]  # (logical_cpu, core_id, socket_id)
 
 PINNING_FILE = "/etc/pinvirt/cpu_pinning_map.json"
 
+class CpuAllocationError(RuntimeError):
+    """Errore nel calcolo del pinning CPU."""
+
+class Errno(IntEnum):
+    NO_SOCKET          = 1
+    INSUFFICIENT_CORES = 2
+
+class LogicalCpu(NamedTuple):
+    logical_id: int
+    core_id:    int
+    socket_id:  int
 
 def load_pinning() -> PinningMap:
     """Loads the CPU pinning data from the local JSON file."""
@@ -77,7 +90,7 @@ def save_pinning(data: PinningMap) -> None:
 def get_cpu_topology() -> CpuInfo:
     """Retrieves the CPU topology of the host system using `lscpu`."""
     try:
-        output: str = subprocess.check_output(
+        output = subprocess.check_output(
             ["lscpu", "-p=CPU,CORE,SOCKET"], universal_newlines=True
         )
     except FileNotFoundError:
@@ -89,6 +102,7 @@ def get_cpu_topology() -> CpuInfo:
 
     topology: CpuInfo = []
     parsed_cpus = set()
+
     for line in output.splitlines():
         if line.startswith("#"):
             continue
@@ -96,16 +110,16 @@ def get_cpu_topology() -> CpuInfo:
         if len(parts) == 3:
             try:
                 logical_cpu, core_id, socket_id = map(int, parts)
-                # Avoid duplicate entries if lscpu output is strange
-                if logical_cpu not in parsed_cpus:
-                    topology.append((logical_cpu, core_id, socket_id))
+                if logical_cpu not in parsed_cpus:          # evita duplicati
+                    topology.append(LogicalCpu(logical_cpu, core_id, socket_id))
                     parsed_cpus.add(logical_cpu)
             except ValueError:
                 print(f"[WARN] Skipping invalid line in lscpu output: {line}")
-                continue
+
     if not topology:
         print("[ERROR] Could not parse any CPU topology information from lscpu.")
         sys.exit(1)
+
     return topology
 
 
@@ -118,106 +132,65 @@ def get_used_logical_cpus(pinning_data: PinningMap) -> Set[int]:
 
 
 def generate_cpu_allocation(
-    cpu_topology: CpuInfo,
-    num_vcpus: int,
-    used_cpus: Set[int],
-    target_socket: Optional[int] = None,
-    allow_multi_socket: bool = False,
-    use_hyperthreads: bool = False, # <-- Nuovo parametro
-) -> List[int]:
-    """
-    Allocates a list of available logical CPUs for vCPU pinning (AUTOMATIC MODE).
+    cpu_topology,              # Iterable[LogicalCpu]
+    num_vcpus,                 # int
+    used_cpus,                 # Set[int]
+    target_socket=None,        # Optional[int]
+    allow_multi_socket=False,  # bool
+    use_hyperthreads=False     # bool
+):
+    available_sockets = {cpu.socket_id for cpu in cpu_topology}
+    if (target_socket is not None) and (target_socket not in available_sockets):
+        logging.error("Socket %s inesistente. Disponibili: %s",
+                      target_socket, sorted(available_sockets))
+        raise CpuAllocationError(Errno.NO_SOCKET)
 
-    Args:
-        cpu_topology: List of tuples (logical_cpu, core_id, socket_id).
-        num_vcpus: Number of vCPUs requested for the VM.
-        used_cpus: Set of logical CPUs already in use.
-        target_socket: Optional socket ID to prefer (defaults to None).
-        allow_multi_socket: If True, allows using CPUs from any socket.
-        use_hyperthreads: If True, assign all threads from a core before
-                          moving to the next. If False (default), assign only
-                          one thread per core.
+    available_cores = {}  # type: Dict[Tuple[int, int], List[int]]
 
-    Returns:
-        A list of logical CPU IDs to assign to vCPUs.
-
-    Raises:
-        SystemExit: If not enough CPUs/cores are available or target socket is invalid.
-    """
-    available_sockets = {socket_id for _, _, socket_id in cpu_topology}
-    if target_socket is not None and target_socket not in available_sockets:
-        print(f"[ERROR] Target socket {target_socket} does not exist. Available: {sorted(list(available_sockets))}")
-        sys.exit(1)
-
-    # --- Build map of available CPUs, grouped by core ---
-    # Dict[Tuple[socket_id, core_id], List[logical_cpu]]
-    available_cores: Dict[Tuple[int, int], List[int]] = {}
-    total_available_logical_cpus = 0
-
-    for logical_cpu, core_id, socket_id in cpu_topology:
-        # Filter by target socket if specified and multi-socket not allowed
-        if target_socket is not None and not allow_multi_socket and socket_id != target_socket:
+    for cpu in cpu_topology:
+        if cpu.logical_id in used_cpus:
             continue
-        # Skip already used CPUs
-        if logical_cpu in used_cpus:
+        if (target_socket is not None and
+            not allow_multi_socket and
+            cpu.socket_id != target_socket):
             continue
 
-        core_key = (socket_id, core_id)
-        if core_key not in available_cores:
-            available_cores[core_key] = []
-        available_cores[core_key].append(logical_cpu)
-        total_available_logical_cpus += 1
+        key = (cpu.socket_id, cpu.core_id)
+        available_cores.setdefault(key, []).append(cpu.logical_id)
 
-    # Sort logical CPUs within each core's list for predictable order
-    for core_key in available_cores:
-        available_cores[core_key].sort()
+    for ids in available_cores.values():
+        ids.sort()
 
-    # Convert to a list of tuples: [((socket, core), [cpus]), ...]
-    # and sort primarily by preferred socket (if specified), then socket, then core
-    def sort_key(item):
+    def core_sort_key(item):
         (socket_id, core_id), _ = item
-        is_preferred = (target_socket is not None and socket_id == target_socket)
-        # Sort preferred socket first (0), others later (1)
-        # Then sort by socket_id, then core_id
-        return (0 if is_preferred else 1, socket_id, core_id)
+        preferred = (target_socket is not None and socket_id == target_socket)
+        return (0 if preferred else 1, socket_id, core_id)
 
-    sorted_core_groups = sorted(available_cores.items(), key=sort_key)
+    sorted_core_groups = sorted(available_cores.items(), key=core_sort_key)
 
-    # --- Select CPUs based on the chosen strategy ---
-    assigned_cpus: List[int] = []
+    assigned = []  # type: List[int]
 
     if not use_hyperthreads:
-        # Strategy 1: One logical CPU per physical core (Original Behavior)
-        available_single_cpus = [cpus[0] for _, cpus in sorted_core_groups if cpus] # Take the first CPU from each core
-        if len(available_single_cpus) < num_vcpus:
-             socket_msg = f" on socket {target_socket}" if target_socket is not None and not allow_multi_socket else ""
-             print(f"[ERROR] Not enough available physical cores{socket_msg} (using one thread per core strategy). Required: {num_vcpus}, Available cores: {len(available_single_cpus)}.")
-             sys.exit(2)
-        assigned_cpus = available_single_cpus[:num_vcpus]
-
+        single_threads = [cpus[0] for _, cpus in sorted_core_groups]
+        if len(single_threads) < num_vcpus:
+            logging.error("Insufficient physical cores: required %s, available %s",
+                          num_vcpus, len(single_threads))
+            raise CpuAllocationError(Errno.INSUFFICIENT_CORES)
+        assigned = single_threads[:num_vcpus]
     else:
-        # Strategy 2: Use all logical CPUs from a core before moving to the next (--use-hyperthreads)
-        if total_available_logical_cpus < num_vcpus:
-             socket_msg = f" on socket {target_socket}" if target_socket is not None and not allow_multi_socket else ""
-             print(f"[ERROR] Not enough available logical CPUs{socket_msg} (using hyper-threading strategy). Required: {num_vcpus}, Available logical CPUs: {total_available_logical_cpus}.")
-             sys.exit(2)
+        total_logical = sum(len(cpus) for cpus in available_cores.values())
+        if total_logical < num_vcpus:
+            logging.error("Insufficient logical cpu: requests %s, available %s",
+                          num_vcpus, total_logical)
+            raise CpuAllocationError(Errno.INSUFFICIENT_CORES)
 
-        for _, logicals in sorted_core_groups:
-            remaining_needed = num_vcpus - len(assigned_cpus)
-            if remaining_needed <= 0:
-                break # Already have enough CPUs
+        for _, cpus in sorted_core_groups:
+            need = num_vcpus - len(assigned)
+            if need <= 0:
+                break
+            assigned.extend(cpus[:need])
 
-            # Add CPUs from this core's list until we have enough or the list runs out
-            cpus_to_add = logicals[:remaining_needed]
-            assigned_cpus.extend(cpus_to_add)
-
-        # Final check (should not happen if total_available check passed, but good practice)
-        if len(assigned_cpus) < num_vcpus:
-            print(f"[ERROR] Internal error: Could not gather enough CPUs ({len(assigned_cpus)}/{num_vcpus}) even with hyper-threading strategy.")
-            sys.exit(2)
-
-    return sorted(assigned_cpus) # Return sorted list
-
+    return sorted(assigned)
 
 def build_ovirt_pinning_string(assigned_cpus: List[int]) -> str:
     """Formats a list of logical CPUs into a pinning string compatible with oVirt."""
@@ -338,8 +311,6 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="pinvirt",
         description=(
             "Manage vCPU pinning for virtual machines.\n\n"
-            "Legacy commands prefixed by two dashes remain supported "
-            "for full backwards compatibility."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
