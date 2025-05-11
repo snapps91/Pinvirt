@@ -1,6 +1,6 @@
 # Pinvirt - oVirt/OLVM/RHV Cpu Pinning Tool
 
-[![RPM Available](https://img.shields.io/badge/RPM-Available-brightgreen)](https://github.com/snapps91/Pinvirt/releases)
+[![RPM Available](https://img.shields.io/badge/RPM-Available-brightgreen)](https://github.com/snapps91/Pinvirt/releases) [![Test and Build RPM](https://github.com/snapps91/Pinvirt/actions/workflows/test-build.yml/badge.svg)](https://github.com/snapps91/Pinvirt/actions/workflows/test-build.yml)
 
 **Pinvirt** is a lightweight CPU Pinning Manager for Virtual Machines (VMs) on Linux systems.
 
